@@ -1,0 +1,28 @@
+<mvc:View xmlns="sap.ui.unified" xmlns:huePi="sap.ui.iot.huePi.views" xmlns:m="sap.m" xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.Main">
+	<Shell id="mainShell">
+		<headItems>
+			<ShellHeadItem icon="sap-icon://menu2" press="onPressMenu"/>
+			<!-- <ShellHeadItem icon="sap-icon://home" press="onPressHome"/> -->
+		</headItems>
+		<search>
+		</search>
+		<headEndItems>
+			<!-- <ShellHeadItem icon="sap-icon://folder" press="onPressDirectory"/> -->
+			<ShellHeadItem icon="sap-icon://settings" press="onPressSettings"/>
+		</headEndItems>
+
+		<content>
+			<SplitContainer id="content">
+				<secondaryContent>
+					<mvc:XMLView viewName="sap.ui.iot.huePi.views.Menu" async="true" />
+				</secondaryContent>
+				<content>
+					<mvc:XMLView viewName="sap.ui.iot.huePi.views.Home" async="true" />
+				</content>
+			</SplitContainer>
+		</content>
+
+		<paneContent>
+		</paneContent>
+	</Shell>
+</mvc:View>

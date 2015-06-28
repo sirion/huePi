@@ -1,0 +1,43 @@
+#!/bin/bash
+
+
+if [[ ! -f ./huePiConfig ]]; then
+		echo "ERROR: Program must be run in the same directory as the hueConfig script" >&2
+		exitStatus=3
+fi
+. ./huePiConfig
+
+
+bridgeIp=$(./findBridge)
+
+
+if [[ $bridgeIp =~ ^([0-9]+\.){3}[0-9]+$ ]]; then
+  echo "Bridge found: $bridgeIp"
+else
+  exit 1
+fi
+
+
+user=$(openssl rand 16 | od -A d -t u8 -w64 | awk '$1 0{8} { print $2 }' | grep -v "^$" | cut -c 1-10)
+appName="huePi"
+hostName=$(hostname)
+userName=$(whoami)
+payload="{\"devicetype\": \"$appName#$hostName $userName\", \"username\": \"$user\"}"
+
+echo -n "Please press button on bridge now (ctrl-c to abort)"
+userCreated=0
+while [[ $userCreated -lt 1 ]]; do
+  response=$(curl -k -s -X "POST" --header "content-type:application/json" -d "$payload" "http://$bridgeIp/api")
+
+  success=$(echo $response | sed -r 's/.*success.*/1/')
+  if [[ "$success" == "1" ]]; then
+    # We whitelisted a new user
+    setStoredUser "$user"
+    echo ""
+    echo "User created and saved: $user"
+    break;
+  fi
+
+  echo -n "."
+  sleep 5s
+done

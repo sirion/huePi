@@ -1,0 +1,68 @@
+<mvc:View xmlns:l="sap.ui.layout" xmlns:c="sap.ui.custom" xmlns:huePi="sap.ui.iot.huePi.views" xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.Lights">
+	<Text text="Lights" />
+	<List items="{lights>/}">
+		<items>
+			<!-- <StandardListItem type="Active" title="{lights>name} - On: {lights>state/on}" press="onLightPressed" /> -->
+			<CustomListItem>
+				<l:Splitter class="invisibleSplitter">
+					<Switch state="{lights>state/on}" change="onLightSwitch">
+						<layoutData>
+							<l:SplitterLayoutData size="70px" />
+						</layoutData>
+					</Switch>
+					<Slider
+						value="{lights>state/bri}"
+						min="1"
+						max="254"
+						liveChange="onBrightnessLiveChange"
+						change="onBrightnessChange"
+						width="100%"
+						class="">
+						<layoutData>
+							<l:SplitterLayoutData size="200px" />
+						</layoutData>
+					</Slider>
+					<Slider
+						enabled="{ path: 'lights>type', formatter: '.formatColorEnabled' }"
+						value="{lights>state/hue}"
+						min="0"
+						max="65535"
+						liveChange="onHueLiveChange"
+						change="onHueChange"
+						width="100%"
+						class="hueSlider">
+						<layoutData>
+							<l:SplitterLayoutData size="150px" />
+						</layoutData>
+					</Slider>
+					<c:SaturationSlider
+						id="saturationSlider"
+						enabled="{ path: 'lights>type', formatter: '.formatColorEnabled' }"
+						value="{lights>state/sat}"
+						hue="{lights>state/hue}"
+						min="0"
+						max="254"
+						liveChange="onSaturationLiveChange"
+						change="onSaturationChange"
+						width="100%"
+						class="saturationSlider">
+						<c:layoutData>
+							<l:SplitterLayoutData size="100px" />
+						</c:layoutData>
+					</c:SaturationSlider>
+					<Text text="{lights>name}" class="lightNameText" />
+				</l:Splitter>
+			</CustomListItem>
+		</items>
+	</List>
+
+<!--
+	<l:Splitter>
+		<mvc:XMLView id="lightDetail" viewName="sap.ui.iot.huePi.views.LightDetail" async="true">
+			<:layoutData>
+				<l:SplitterLayoutData size="300px" />
+			</l:layoutData>
+		</mvc:XMLView>
+	</l:Splitter>
+-->
+</mvc:View>

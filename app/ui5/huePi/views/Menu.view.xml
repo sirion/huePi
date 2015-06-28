@@ -1,0 +1,9 @@
+<mvc:View xmlns="sap.m" xmlns:u="sap.ui.unified" xmlns:huePi="sap.ui.iot.huePi.views"  xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.Menu">
+	<List>
+		<items>
+			<StandardListItem title="Lights" type="Active" press="onItemPress" />
+			
+			<StandardListItem title="Settings" type="Active" press="onItemPress" />
+		</items>
+	</List>
+</mvc:View>

@@ -1,0 +1,82 @@
+#!/bin/bash
+
+appDir=~/".huePi"
+discoveryUrl="https://www.meethue.com/api/nupnp"
+#localNetwork="192.168.1.0/24" # Defaults to /24 network around current IP address
+
+
+function initConfig() {
+	if [[ ! -d "$appDir" ]]; then
+		mkdir "$appDir"
+	fi
+
+	if [[ ! -f "$appDir/bridgeIp" ]]; then
+		touch "$appDir/bridgeIp"
+	fi
+
+	if [[ ! -f "$appDir/bridgeUser" ]]; then
+		touch "$appDir/bridgeUser"
+	fi
+
+	if [[ "$localNetwork" == "" ]]; then
+		findLocalNetwork
+	fi
+}
+
+function identifyBridge() {
+	result=""
+	response=$(curl -k -s --connect-timeout 3 "http://$1/description.xml" | grep -i "Philips hue bridge" | wc -l)
+	if [[ $response -gt 0 ]]; then
+		result=1
+	fi
+}
+
+function getStoredBridgeIp() {
+	result=""
+
+	if [[ -f "$appDir/bridgeIp" ]]; then
+		result=$(cat "$appDir/bridgeIp")
+	fi
+
+	if [[ "$result" != "" ]]; then
+		# ping -c 1 -W 1 "$result" > /dev/null;
+		# if [[ "$?" != "0" ]]; then
+		# 	# Bridge does not respond
+		# 	result=""
+		# fi
+		bridgeIp="$result"
+		identifyBridge "$bridgeIp"
+		if [[ "$result" == "1" ]]; then
+			result="$bridgeIp"
+		else
+			# Truncate bridge IP file
+			echo -n "" > "$appDir/bridgeIp"
+			result=""
+		fi
+	fi
+}
+
+function setStoredBridgeIp() {
+	echo -n "$1" > "$appDir/bridgeIp"
+}
+
+function getStoredUser() {
+	result=""
+
+	if [[ -f "$appDir/bridgeUser" ]]; then
+		result=$(cat "$appDir/bridgeUser")
+	fi
+}
+
+function setStoredUser() {
+	echo -n "$1" > "$appDir/bridgeUser"
+}
+
+
+if [[ "$1" == "--show" ]]; then
+	getStoredBridgeIp
+	echo "Bridge IP: $result"
+
+	getStoredUser
+	echo "User: $result"
+fi

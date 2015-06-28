@@ -1,0 +1,15 @@
+<mvc:View xmlns="sap.ui.core" xmlns:huePi="sap.ui.iot.huePi.views" xmlns:m="sap.m" xmlns:l="sap.ui.layout" xmlns:c="sap.ui.custom" xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.LightDetail">
+	<l:VerticalLayout>
+		<m:Text text="Name: {lights>name}" />
+		<m:Switch state="{lights>state/on}" change="onLightSwitch" />
+		<m:Text text="Brightness: {lights>state/bri}" />
+		<m:Slider
+			value="{lights>state/bri}"
+			min="0"
+			max="254"
+			liveChange="onBrightnessLiveChange"
+			change="onBrightnessChange"
+			class="sapUiSmallMarginBottom" />
+		<c:Code text="{ path: 'lights>', formatter: '.formatStringify'}" />
+	</l:VerticalLayout>
+</mvc:View>

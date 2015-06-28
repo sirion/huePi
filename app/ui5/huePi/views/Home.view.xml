@@ -1,0 +1,3 @@
+<mvc:View xmlns="sap.ui.unified" xmlns:huePi="sap.ui.iot.huePi.views" xmlns:m="sap.m" xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.Home">
+	<m:Text text="Test" />
+</mvc:View>

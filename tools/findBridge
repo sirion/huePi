@@ -1,0 +1,322 @@
+#!/bin/bash
+
+###############################################################################
+
+scriptName=$(basename "$0")
+
+scriptAuthor="Jens Himmelrath"
+
+scriptVersion="0.1"
+
+scriptDate="2015-06-13"
+
+scriptUrl="http://himmelrath.net/"
+
+scriptLicense="MIT"
+
+scriptDescription=$(cat <<EOT
+This script tries to find the IP of the Philips Hue Bridge in the current network
+EOT
+)
+
+scriptgeneralizedCommand=""
+
+scriptExampleCommand=""
+
+scriptObligatoryParameters=""
+
+scriptOptionalParameters=$(cat <<EOT
+  --verbose - Outputs debug messages to stderr
+EOT
+)
+
+scriptExitCodesList=$(cat <<EOT
+   0 - Everything is fine
+   1 - Wrong parameters
+   2 - Required programs missing
+	 3 - Program run outside directory with hueConfig script
+EOT
+)
+
+scriptRequiredPrograms=( "nmap" "awk" "sed" "curl" "grep" "wc" "sort" "uniq" "cat" "ip" "tail")
+
+
+###############################################################################
+
+
+
+############################### Begin Functions ###############################
+# Functions have to be 'declared' prior to using them
+
+# General help that is shown whenever the script cannot be run because the user
+# did not provide sufficient parameters
+function showHelp {
+    echo ""
+    echo " $scriptName v$scriptVersion - $scriptDate"
+    echo "     License: $scriptLicense"
+    echo "     Author:  $scriptAuthor"
+    echo "     see $scriptUrl"
+    echo ""
+    echo "$scriptDescription"
+    echo ""
+		echo "Usage:"
+    echo "   \"$cmd $scriptgeneralizedCommand\""
+    echo ""
+
+		if [[ "$scriptObligatoryParameters" != "" ]]; then
+    	echo "Obligatory parameters:"
+    	echo "$scriptObligatoryParameters"
+    	echo ""
+		fi
+
+		if [[ "$scriptOptionalParameters" != "" ]]; then
+	    echo "Optional parameters:"
+	    echo "$scriptOptionalParameters"
+	    echo ""
+		fi
+
+		if [[ "$scriptExampleCommand" != "" ]]; then
+	    echo "Example: "
+	    echo "   \"$cmd $scriptExampleCommand\""
+	    echo ""
+		fi
+
+    echo "Exit-Codes:"
+    echo "$scriptExitCodesList"
+    echo ""
+
+}
+
+# Used to output certain information only in verbose-mode
+function echoIfVerbose {
+    if [[ $verbose -eq 1 ]]; then
+        echo $@
+    fi
+}
+
+
+result="" # Result from the previously called function as global variable
+
+function debug() {
+	if [[ $verbose -eq 1 ]]; then
+		echo "$@" >&2
+	fi
+}
+
+
+function findLocalNetwork() {
+	# TODO: This finds the IP of the last network interface, might work...
+	localNetwork=$(ip -4 addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{ print $2 }' | tail -n 1 | sed 's/\.[0-9]*\/.*/.0\/24/' )
+}
+
+function findBridgeIp() {
+	result=""
+
+	getStoredBridgeIp
+
+	if [[ "$result" == "" ]]; then
+		debug "No stored IP..."
+		discoverBridge
+		setStoredBridgeIp "$result"
+	else
+		debug "Using stored IP"
+	fi
+}
+
+
+function discoverBridge() {
+	debug "Using SSDP"
+	result=$(gssdp-discover -n 3 | grep "/description.xml" | awk '{ print $2 }' | sed -r 's/.*http:\/\/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/' | sort -u | uniq | while read metadataUrl; do
+		debug -n "SSD found: $metadataUrl"
+		identifyBridge "$metadataUrl"
+		if [[ "$result" == "1" ]]; then
+			# Bridge found
+			debug " ...confirmed"
+			echo "$metadataUrl"
+			break;
+		else
+			debug " ...no bridge"
+		fi
+	done)
+
+	if [[ "$result" == "" ]]; then
+		# Bridge not found usind SSDP
+		debug -n "Trying online service. Response: "
+		bridgeJson=$(curl -k -s --connect-timeout 10 "$discoveryUrl")
+		debug "${bridgeJson:0:20}..."
+		matched=$(echo "$bridgeJson" | grep '"internalipaddress":' | wc -l)
+
+		if [[ $matched -gt 1 ]]; then
+			# Get Bride IP from cloud service
+
+			identifyBridge "$metadataUrl"
+			if [[ "$result" == "1" ]]; then
+				# Bridge found
+				result="$metadataUrl"
+			fi
+
+			debug "Using Service provided IP"
+			result=$(echo "$bridgeJson" | sed -E 's/.*"internalipaddress":"([^"]+)".*/\1/')
+		fi
+
+
+		if [[ "$result" == "" ]]; then
+			# Scan the local network
+			# TODO: Find better way than checking for tcpwrapped match
+			nmapOptions="-p 80 -n -T5 --open -oG - -sV $localNetwork"
+
+			debug "Scanning Network for IP using: nmap $nmapOptions"
+			result=$(nmap $nmapOptions | awk '/tcpwrapped/ { print $2 }')
+		fi
+	fi
+}
+
+
+################################ End Functions ################################
+
+
+########################## Begin Prerequisites Check ##########################
+
+# Name of the Script file - still correct if file was renamed
+cmd=$(basename "$0")
+
+
+# Add the script's folder to the path. Useful if other programs in the same path
+# might be needed and all scripts are in a user defined folder.
+PATH=$PATH:$(dirname "$0")
+
+
+# Check for required programs before starting
+requiredOk=1
+for prg in "${scriptRequiredPrograms[@]}"; do
+    path=$(which $prg)
+    if [[ "" == "$path" ]]; then
+        requiredOk=0
+        echo "ERROR: Required program '$prg' not found" >&2
+    fi
+done
+
+if [[ $requiredOk -eq 0 ]]; then
+    echo "       Please provide those programs in order to use this script" >&2
+    exit 2
+fi
+
+########################### End Prerequisites Check ###########################
+
+
+############################ Begin Parameter Check ############################
+
+# Initializing needed variables. These are usually the default values for all
+# parameters that are not obligatory.
+exitStatus=0
+verbose=0
+
+# Analyze parameters
+for param in "$@"; do
+    knownParam=0
+
+    #### Always set $knownParam to 1 when a parameter is found
+
+
+    #### Example: parameter is "--of=" + the value.
+    #### since "--of=" is 5 characters long, we check for the first 5 characters
+    #### and if it is found use the rest of the parameter as value
+    #
+    # if [[ "${param:0:5}" == "--of=" ]]; then
+    #     knownParam=1
+    #     outFile="${param:5}"
+    # fi
+
+    #### Example: This Parameter is an image resolution, this can be found by
+    #### matching the parameter.
+    #
+    # if [[ "${param:0:2}" != "--" ]]; then
+    #     knownParam=1
+    #     match=$(expr match "$param" '\([0-9]*x[0-9]*\)')
+    #     if [[ "$match" != "$param" ]]; then
+    #         echo "ERROR: RES-pramatemer format must be WIDTHxHEIGHT (e.g. '1024x768'): '$param'" >&2
+    #         exitStatus=6
+    #     fi
+    #
+    #     resolutions[${#resolutions[*]}]=$param
+    # fi
+
+
+    #### Example of a simple parameter without value
+    #
+    # if [[ "${param:0:9}" == "--verbose" ]]; then
+    #     knownParam=1
+    #     verbose=1
+    # fi
+
+		if [[ "${param:0:9}" == "--verbose" ]]; then
+       knownParam=1
+       verbose=1
+    fi
+
+
+    # Check for unknown parameters
+    # Has to be at the end of this loop
+    if [[ $knownParam -eq 0 ]]; then
+        echo "ERROR: Unknown Parameter '$param'" >&2
+        exitStatus=2
+    fi
+done
+
+############################# End Parameter Check #############################
+
+
+############################## Begin Values Check #############################
+
+
+#### Example of checking for a value
+#
+# if [[ "$outFile" == "" ]]; then
+#     echo "ERROR: Obligatory Parameters not given" >&2
+#     echo "       Please provide an out-file (--of) parameters" >&2
+#     exitStatus=1
+# fi
+
+#### Example of checking for more than one value
+#
+# if [[ ${#resolutions[@]} -lt 2 ]]; then
+#     echo "ERROR: Not enough RES-parameters given" >&2
+#     echo "       Please provide at least two image resolutions" >&2
+#     exitStatus=3
+# fi
+
+if [[ ! -f ./huePiConfig ]]; then
+		echo "ERROR: Program must be run in the same directory as the hueConfig script" >&2
+		exitStatus=3
+fi
+. ./huePiConfig
+
+
+if [[ $exitStatus -ne 0 ]]; then
+    ## Code for debugging parameters
+    #echo "Parameters received:"
+    #x=0
+    #while [[ "$1" != "" ]]; do
+    #   let "x = $x + 1"
+    #   echo "$x: $1"
+    #   shift
+    #done
+
+    showHelp
+    exit $exitStatus
+fi
+
+############################### End Values Check ##############################
+
+############################# Begin Actual Script #############################
+
+
+initConfig
+
+findBridgeIp
+
+echo "$result"
+
+exit 0
+
+############################## End Actual Script ##############################
