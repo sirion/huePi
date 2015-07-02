@@ -119,6 +119,16 @@ The default port for the server is 8888, you can change the default value at the
 
 The bridge-port must of course be the same as set as "remotePort" in the ssh tunnel.
 
+#### 2 Apache configuration
+
+You can use Apache's <a href="http://httpd.apache.org/docs/current/mod/mod_proxy.html">mod_proxy</a> for this task. The configuration is straight forward, just like any other apache vhost:
+
+Simply add the following lines to the vhost configuration:
+
+```
+ProxyPass "/" "http://localhost:8888/"
+ProxyPassReverse "/" "http://localhost:8888/"
+```
 
 ## Local UI5 version
 
