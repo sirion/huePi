@@ -1,6 +1,5 @@
 var httpPort = 8888;
 
-
 /* global require, process */
 /* eslint-disable no-console */
 (function() {
@@ -35,12 +34,14 @@ try {
 	});
 } catch (ex) {
 	// Ignored...
+	console.error(ex.message);
 }
 try {
 	bridgeIp = fs.readFileSync(userDir + "/.huePi/bridgeIp", { encoding: "utf8"});
 	user = fs.readFileSync(userDir + "/.huePi/bridgeUser", { encoding: "utf8"});
 } catch (ex) {
-	console.error("Error getting bridge user and ip. Aborting server start");
+	console.error(ex.message);
+	console.error("Error getting bridge user and ip from " + userDir + "/.huePi/[...]. Aborting server start");
 	process.exit(1);
 }
 
@@ -60,7 +61,7 @@ console.log("Server is listening on port " + httpPort);
 function onRequest(request, response) {
 	console.log('serving: ' + request.url);
 
-	if (request.url.indexOf("/bridgeConfig.json") == 0) {
+	/* if (request.url.indexOf("/bridgeConfig.json") == 0) {
 		// Return configuration
 		var data = {
 			user: user,
@@ -71,6 +72,37 @@ function onRequest(request, response) {
 		response.setHeader("Content-Type", "application/json");
 		response.write(JSON.stringify(data), "utf8");
 		response.end();
+	} else */ if (request.url.indexOf("/bridge/") == 0) {
+		// Proxy request
+		var options = {
+			hostname: bridgeIp,
+			port: 80, // Bridge always listens on standard HTTP port
+			path: request.url.replace(/^\/bridge\//, "/api/" + user + "/"),
+			method: request.method
+		};
+
+		// console.log("Forwarding to " + options.method + ": " + options.hostname + options.path);
+
+		// Bridge to client
+		var proxy = http.request(options, function (bridgeResponse) {
+			response.writeHead(bridgeResponse.statusCode, bridgeResponse.headers);
+
+			bridgeResponse.on("data", function(data) {
+				response.write(data, "binary");
+			});
+			bridgeResponse.on("end", function() {
+				response.end();
+			});
+		});
+
+		// Client to bridge
+		request.on("data", function(data) {
+			proxy.write(data, "binary");
+		});
+		request.on("end", function() {
+			proxy.end();
+		});
+
 	} else {
 		fileServer.serve(request, response);
 	}

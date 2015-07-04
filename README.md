@@ -23,7 +23,25 @@ Additionally, mainly because I am forced to use a network provider that does not
 **Work in progress.** Currently you have to make all the setup steps manually; automating some of these is on my todo-list...
 
 
+### Install Node.js on your local server
 
+For my Raspberry Pi, there only was an older version of Node.js available by default, so the following command would install the wrong version:
+
+```sh
+apt-get install nodejs nodejs-legacy npm
+```
+
+I had to build nodejs on the pi. Do the follwing as root like described on http://elinux.org/Node.js_on_RPi:
+
+```sh
+wget https://nodejs.org/dist/v0.12.6/node-v0.12.6.tar.gz
+tar -xzf node-v0.12.6.tar.gz
+cd node-v0.12.6
+./configure
+make
+ make install
+```
+And then either add the new new node-v0.12.6-linux-x86/bin folder to the path or start node directly from that path.
 
 
 ### Connecting to the Hue bridge

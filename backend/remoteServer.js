@@ -66,7 +66,7 @@ console.log("Server is listening on port " + httpPort);
 function onRequest(request, response) {
 	console.log('serving: ' + request.url);
 
-	if (request.url.indexOf("/bridgeConfig.json") == 0) {
+	/* if (request.url.indexOf("/bridgeConfig.json") == 0) {
 		// Return configuration
 		var data = {
 			user: user
@@ -76,7 +76,7 @@ function onRequest(request, response) {
 		response.setHeader("Content-Type", "application/json");
 		response.write(JSON.stringify(data), "utf8");
 		response.end();
-	} else if (request.url.indexOf("/bridge/") == 0) {
+	} else */ if (request.url.indexOf("/bridge/") == 0) {
 		// var proxy = http.createClient(80, bridgeIp);
 		// var proxy_request = proxy.request(request.method, request.url, request.headers);
 
@@ -84,7 +84,7 @@ function onRequest(request, response) {
 		var options = {
 			hostname: "localhost",
 			port: bridgePort,
-			path: request.url.replace(/^\/bridge\//, "/api/" + user + "/"),
+			path: request.url,
 			method: request.method
 		};
 
