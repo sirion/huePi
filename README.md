@@ -43,6 +43,8 @@ make
 ```
 And then either add the new new node-v0.12.6-linux-x86/bin folder to the path or start node directly from that path.
 
+Important: Builing node on the pi takes a considerate amount of time. I hope there will again be an official 32 bit arm build in the future, but for now you either have to build it on the pi or set up a cross compiling environment.
+
 
 ### Connecting to the Hue bridge
 
@@ -160,3 +162,4 @@ UI5 is currently loaded from the cloud - which is generally a good thing because
  * The scripts in the tools directory are bash scripts, it would be nice to use nodejs for all tasks
  * Navigation/Deep-Linking is currently not implemented
  * In order for the remote server to work the .huePi directory must be copied to the remote server and thus the bridge user name must be known to the web-application.
+ * Evaluate building a static node version for the pi and adding it to the project.
