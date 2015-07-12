@@ -8,40 +8,11 @@ function Bridge() {
 
 	Bridge._oInstance = this;
 
+	this._sBridgeUrl = "/bridge/";
+
 	this._oLightState = {};
-	this._sBridgeUser = null;
-	this._sBridgeHost = null;
-	this._sBridgePort = null;
-
 	this._eventListeners = {};
-
-	this._pInitialized = new Promise(function(fnResolve, fnReject) {
-		this._request({
-			url: "/bridgeConfig.json"
-		}).then(function(oRequestInfo) {
-			this._sBridgeUser = oRequestInfo.data.user;
-			this._sBridgeHost = oRequestInfo.data.host;
-			this._sBridgePort = oRequestInfo.data.port;
-
-			if (this._sBridgeUser) {
-				if (this._sBridgeHost) {
-					this._sBridgeUrl = "http://" + this._sBridgeHost;
-
-					if (this._sBridgePort) {
-						this._sBridgeUrl += ":" + this._sBridgePort;
-					}
-				} else {
-					this._sBridgeUrl = "/bridge";
-				}
-
-				this._sBridgeUrl += "/api/" + this._sBridgeUser + "/";
-				fnResolve();
-				this.update();
-			} else {
-				fnReject(new Error("Could not read configuration from backend. Aborting."));
-			}
-		}.bind(this));
-	}.bind(this));
+	this.update();
 }
 
 ////////////////////////////////////////// Static Methods /////////////////////////////////////////
@@ -62,20 +33,17 @@ Bridge.prototype.initialized = function() {
 
 Bridge.prototype.update = function() {
 	if (!this._pUpdate) {
-		this._pUpdate = this._pInitialized.then(function() {
-			return this._bridgeRequest({ url: "lights" }).then(function(oData) {
-				this._pUpdate = null;
-				this._oLightState = oData.data;
-				this._fire("update", [ this._oLightState ]);
-				return this._oLightState;
-			}.bind(this)).catch(function() {
-				this._pUpdate = null;
-				throw new Error("Cannot receive bridge status data");
-			}.bind(this));
+		this._pUpdate = this._bridgeRequest({ url: "lights" }).then(function(oData) {
+			this._pUpdate = null;
+			this._oLightState = oData.data;
+			this._fire("update", [ this._oLightState ]);
+			return this._oLightState;
+		}.bind(this)).catch(function() {
+			this._pUpdate = null;
+			throw new Error("Cannot receive bridge status data");
 		}.bind(this));
 	}
 	return this._pUpdate;
-
 };
 
 Bridge.prototype.toggleLight = function(sLightId, bState) {

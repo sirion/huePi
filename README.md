@@ -31,6 +31,12 @@ For my Raspberry Pi, there only was an older version of Node.js available by def
 apt-get install nodejs nodejs-legacy npm
 ```
 
+YOu can either use the version from this URL: https://github.com/needforspeed/Nodejs-ARM-builder
+
+I opted for using Arch linux on my pi, which already comes with a working version.
+
+...or build Node.js yourself on the raspberry pi (which takes really long).
+
 I had to build nodejs on the pi. Do the follwing as root like described on http://elinux.org/Node.js_on_RPi:
 
 ```sh

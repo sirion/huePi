@@ -1,17 +1,26 @@
 var httpPort = 8888;
 
+
+
 /* global require, process */
 /* eslint-disable no-console */
 (function() {
 "use strict";
 
-var http = require("http");
-var staticServer = require('node-static');
-var fs = require('fs');
+
+var http, fs, staticServer, hasModules = true;
+try { http = require("http"); } catch (ex) { hasModules = false; console.error("Please install node module \"http\"."); }
+try { staticServer = require("node-static"); } catch (ex) { hasModules = false; console.error("Please install node module \"node-static\"."); }
+try { fs = require("fs"); } catch (ex) { hasModules = false; console.error("Please install node module \"fs\"."); }
+
+if (!hasModules) {
+	process.exit(1);
+}
+
+
+var BridgeTools = require("./modules/hue/BridgeTools.js");
 
 var fileServer = new staticServer.Server('../app');
-
-var userDir = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
 
 process.argv.forEach(function (val, index, array) {
 	var pos = val.indexOf("--port=");
@@ -22,28 +31,16 @@ process.argv.forEach(function (val, index, array) {
 });
 
 
-var bridgeIp = "";
-var user = "";
-
 console.log("Searching for bridge...");
 
-try {
-	require("child_process").execSync("../tools/findBridge", {
-		cwd: "../tools",
-		encoding: "utf8"
-	});
-} catch (ex) {
-	// Ignored...
-	console.error(ex.message);
-}
-try {
-	bridgeIp = fs.readFileSync(userDir + "/.huePi/bridgeIp", { encoding: "utf8"});
-	user = fs.readFileSync(userDir + "/.huePi/bridgeUser", { encoding: "utf8"});
-} catch (ex) {
-	console.error(ex.message);
-	console.error("Error getting bridge user and ip from " + userDir + "/.huePi/[...]. Aborting server start");
+var bridgeConfig = BridgeTools.getBridgeConfig();
+
+
+if (!bridgeConfig.host || !bridgeConfig.user) {
+	console.error("Error getting bridge user and ip from the configuration file. Aborting server start");
 	process.exit(1);
 }
+
 
 
 http.createServer(function() {
@@ -64,8 +61,8 @@ function onRequest(request, response) {
 	/* if (request.url.indexOf("/bridgeConfig.json") == 0) {
 		// Return configuration
 		var data = {
-			user: user,
-			host: bridgeIp,
+			user: bridge.user,
+			host: bridge.host,
 			port: 80 // The hue bridge always listens on port 80
 		};
 		response.statusCode = 200;
@@ -75,13 +72,13 @@ function onRequest(request, response) {
 	} else */ if (request.url.indexOf("/bridge/") == 0) {
 		// Proxy request
 		var options = {
-			hostname: bridgeIp,
-			port: 80, // Bridge always listens on standard HTTP port
-			path: request.url.replace(/^\/bridge\//, "/api/" + user + "/"),
+			hostname: bridgeConfig.host,
+			port: bridgeConfig.port,
+			path: request.url.replace(/^\/bridge\//, "/api/" + bridgeConfig.user + "/"),
 			method: request.method
 		};
 
-		// console.log("Forwarding to " + options.method + ": " + options.hostname + options.path);
+		console.log("Forwarding to " + options.method + ": " + options.hostname + options.path);
 
 		// Bridge to client
 		var proxy = http.request(options, function (bridgeResponse) {
