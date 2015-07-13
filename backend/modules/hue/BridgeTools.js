@@ -3,27 +3,155 @@
 (function(module, process) {
 "use strict";
 
-var fs = require("fs");
-var os = require("os");
-
-var isWindows = process.platform.indexOf("win") === 0;
-var userDir = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
-var appDir = userDir + "/.huePi";
-var configPath = appDir + "/config.json";
-
-
-var defaultConfig = {
-	bridgeUser: "",
-	bridgeHost: ""
-};
-
 var BridgeTools = {
 
+	_defaultConfig: {
+		bridgeUser: "",
+		bridgeHost: "",
+		bridgePort: 80 // Bridge always listens on standard HTTP port
+	},
+
+	_requiredPrograms: [
+		// removed: ip grep awk tail sed
+		"nmap", "awk", "sed", "curl", "grep", "wc", "sort", "uniq", "cat", "ip", "tail"
+	],
+
+	_requiredModules: [
+		"fs", "os", "node-ssdp", "https"
+	],
+
+	// External resolve/reject methods for the ready Promise
+	_resolveReady: null,
+	_rejectReady: null,
+
+	_ready: new Promise(function(resolve, reject) {
+		this._resolveReady = resolve;
+		this._rejectReady = reject;
+	}.bind(this)),
+
 	init: function() {
+		if (!this._checkRequiredPrograms()) {
+			console.error("Please install required programs in the system");
+			throw new Error("Not all required programs are available on the system");
+		}
+
+		this._isWindows = process.platform.indexOf("win") === 0;
+		this._userDir = process.env[this._isWindows ? 'USERPROFILE' : 'HOME'];
+		this._appDir = this._userDir + "/.huePi";
+		this._configPath = this._appDir + "/config.json";
+
+		// Load required modules
+		this._fs = require("fs");
+		this._os = require("os");
+		this._ssdp = require("node-ssdp");
+		this._https = require("https");
+
 		this.config = this._readConfig();
-		this._defaults(this.config, defaultConfig);
-		
-		console.log("read config: " + JSON.stringify(this.config, null, 4));
+		this._defaults(this.config, this._defaultConfig);
+		// console.log("read config: " + JSON.stringify(this.config, null, 4));
+
+		this._whenBridgeDiscovered().then(function() {
+			return this._whenUserCreated();
+		}.bind(this), function() {
+			this._rejectReady(new Error("Bridge could not be discovered"));
+		}.bind(this)).then(function() {
+			this._resolveReady(this.config);
+		}.bind(this), function() {
+			this._rejectReady(new Error("User could not be created"));
+		}.bind(this));
+
+	},
+
+	/**
+	 * Returns a promise that resolves when contact to the bridge has been established,
+	 * meaning that the IP has been discovered, a user has been created and the connection
+	 * was successfull
+	 *
+	 * @returns {Promise} The promise that resolves when commincation is established or else rejects with an error
+	 * @public
+	 */
+	ready: function() {
+		return this._ready;
+	},
+
+	/**
+	 * Returns a promise that resolves when the bridge host/ip has been discovered on the network
+	 * or one has already been stored in the configuration before
+	 *
+	 * @returns {Promise} The promise that resolves when the bridge host/ip is known
+	 * @private
+	 */
+	_whenBridgeDiscovered: function() {
+		if (this.config.bridgeHost) {
+			// TODO: Check if bridge is available, else search for bridge again (might have gotten a different IP from DHCP)
+			return Promise.resolve();
+		} else {
+			// No stored bridge host, try to discover the bridge...
+
+			// TODO: Discover via SSDP
+
+			// Discover via web service
+			return this._bridgeDiscoveredViaWeb().then(function(bridgeData) {
+				this.config.bridgeHost = bridgeData.bridgeHost;
+				return this.config;
+			}.bind(this));
+
+
+			// TODO: Discover via network scan
+		}
+	},
+
+	_bridgeDiscoveredViaWeb: function() {
+		return new Promise(function(resolve, reject) {
+			var options = {
+				host: 'www.meethue.com',
+				path: '/api/nupnp'
+			};
+
+			var onDataReceived = function(data) {
+				try {
+					var bridgeData = JSON.parse(data);
+					if (bridgeData.internalipaddress) {
+						resolve({
+							bridgeHost: bridgeData.internalipaddress
+						});
+					} else {
+						throw new Error("Response from web service did not contain Bridge IP");
+					}
+				} catch (ex) {
+					reject(ex);
+				}
+			};
+
+			var req = this._https.request(options, function (res) {
+				var data = '';
+				res.on('data', function (chunk) {
+					data += chunk;
+				});
+				res.on('end', function () {
+					onDataReceived(data);
+				});
+			});
+			req.on('error', function (e) {
+				reject(e);
+			});
+			req.end();
+		});
+	},
+
+	/**
+	 * Returns a promise that resolves when the bridge user has been created or one has already
+	 * been stored in the configuration before
+	 *
+	 * @returns {Promise} The promise that resolves when a user is available
+	 * @private
+	 */
+	_whenUserCreated: function() {
+		if (this.config.bridgeUser) {
+			return Promise.resolve();
+		} else {
+			throw "BridgeTools._whenUserCreated: Not yet implemented";
+		}
 	},
 
 	/**
@@ -33,15 +161,27 @@ var BridgeTools = {
 	 * @private
 	 */
 	_checkRequiredPrograms: function() {
-		// removed: ip grep awk tail sed
-		var requiredPrograms = [ "nmap", "awk", "sed", "curl", "grep", "wc", "sort", "uniq", "cat", "ip", "tail" ];
-		return requiredPrograms.reduce(function(previousValue, currentValue) {
+		var hasRequiredPrograms = this._requiredPrograms.reduce(function(previousValue, currentValue) {
 			var programExists = this._programExists(currentValue);
 			if (!programExists) {
 				console.error("Required program " + currentValue + " not found in path.");
 			}
 			return previousValue && programExists;
 		}.bind(this));
+
+		var hasrequiredModules = this._requiredModules.reduce(function(previousValue, currentValue) {
+			var programExists = false;
+			try {
+				require.resolve(currentValue);
+				programExists = true;
+			} catch (ex) {
+				console.error("Required module " + currentValue + " not found in path.");
+			}
+
+			return previousValue && programExists;
+		});
+
+		return hasRequiredPrograms && hasrequiredModules;
 	},
 
 	/**
@@ -58,16 +198,16 @@ var BridgeTools = {
 
 		for (var i = 0; i < paths.length; ++i) {
 			var execPath = paths[i] + "/" + execName;
-			if (fs.existsSync(execPath)) {
+			if (this._fs.existsSync(execPath)) {
 				return true;
 			}
 
-			if (isWindows) {
+			if (this._isWindows) {
 				if (
-					fs.existsSync(execPath + ".exe") ||
-					fs.existsSync(execPath + ".com") ||
-					fs.existsSync(execPath + ".bat") ||
-					fs.existsSync(execPath + ".cmd")
+					this._fs.existsSync(execPath + ".exe") ||
+					this._fs.existsSync(execPath + ".com") ||
+					this._fs.existsSync(execPath + ".bat") ||
+					this._fs.existsSync(execPath + ".cmd")
 				) {
 					return true;
 				}
@@ -86,7 +226,7 @@ var BridgeTools = {
 	_findNetworkAddresses4: function() {
 		var addresses = [];
 
-		var networkInterfaces = os.networkInterfaces();
+		var networkInterfaces = this._os.networkInterfaces();
 		for (var name in networkInterfaces) {
 			var interfaceInfos = networkInterfaces[name];
 			for (var i = 0; i < interfaceInfos.length; ++i) {
@@ -110,14 +250,14 @@ var BridgeTools = {
 	_readConfig: function() {
 		var config = {};
 		try {
-			var configData = fs.readFileSync(configPath, { encoding: "utf-8" });
+			var configData = this._fs.readFileSync(this._configPath, { encoding: "utf-8" });
 			// Remove comments which are invalid in real JSON
 			configData = configData
 				.replace(/\/\/.*/g, "")
 				.replace(/\/\*.*\*\//gm, "");
 			config = JSON.parse(configData);
 		} catch (ex) {
-			console.error("Config file could not be parsed: " + configPath);
+			console.error("Config file could not be parsed: " + this._configPath);
 		}
 		return config;
 	},
@@ -138,9 +278,9 @@ var BridgeTools = {
 
 		// TODO: Preserve comments
 		try {
-			fs.writeFileSync(configPath, JSON.stringify(config), { encoding: "utf-8" });
+			this._fs.writeFileSync(this._configPath, JSON.stringify(config), { encoding: "utf-8" });
 		} catch (ex) {
-			console.error("Could not write config file " + configPath + " - " + ex.message);
+			console.error("Could not write config file " + this._configPath + " - " + ex.message);
 		}
 	},
 
@@ -176,7 +316,7 @@ var BridgeTools = {
 		return {
 			host: this.config.bridgeHost,
 			user: this.config.bridgeUser,
-			port: this.config.bridgePort || 80  // Bridge always listens on standard HTTP port
+			port: this.config.bridgePort
 		};
 	},
 
@@ -190,20 +330,7 @@ var BridgeTools = {
 
 };
 
-
 BridgeTools.init();
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -211,7 +338,8 @@ BridgeTools.init();
 module.exports = {
 	createUser:  BridgeTools.createUser.bind(BridgeTools),
 	findBridge:  BridgeTools.findBridge.bind(BridgeTools),
-	getBridgeConfig:  BridgeTools.getBridgeConfig.bind(BridgeTools)
+	getBridgeConfig:  BridgeTools.getBridgeConfig.bind(BridgeTools),
+	ready:  BridgeTools.ready.bind(BridgeTools)
 };
 
 })(module, process);
