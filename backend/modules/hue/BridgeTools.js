@@ -40,17 +40,11 @@ var BridgeTools = {
 		this._appDir = this._userDir + "/.huePi";
 		this._configPath = this._appDir + "/config.json";
 
-		// Load required modules
-		this._fs = require("fs");
-		this._os = require("os");
-		this._ssdp = require("node-ssdp");
-		this._https = require("https");
-
 		this.config = this._readConfig();
 		this._defaults(this.config, this._defaultConfig);
 		// console.log("read config: " + JSON.stringify(this.config, null, 4));
 
-		this._whenBridgeDiscovered().then(function() {
+		return this._whenBridgeDiscovered().then(function() {
 			return this._whenUserCreated();
 		}.bind(this), function() {
 			this._rejectReady(new Error("Bridge could not be discovered"));
@@ -59,7 +53,6 @@ var BridgeTools = {
 		}.bind(this), function() {
 			this._rejectReady(new Error("User could not be created"));
 		}.bind(this));
-
 	},
 
 	/**
@@ -88,21 +81,51 @@ var BridgeTools = {
 		} else {
 			// No stored bridge host, try to discover the bridge...
 
-			// TODO: Discover via SSDP
-
-			// Discover via web service
-			return this._bridgeDiscoveredViaWeb().then(function(bridgeData) {
+			// Discover via SSDP
+			return this._bridgeDiscoveredViaSsdp().then(function(bridgeData) {
+				// SSDP Scan successful
 				this.config.bridgeHost = bridgeData.bridgeHost;
 				return this.config;
-			}.bind(this));
+			}.bind(this), function() {
+				// SSDP Scan not successful
+				// Discover via web service
+				return this._bridgeDiscoveredViaWeb().then(function(bridgeData) {
+					this.config.bridgeHost = bridgeData.bridgeHost;
+					return this.config;
+				}.bind(this), function() {
+					// TODO: Discover via network scan
+					throw new Error("Network scan discovery not implemented yet");
+				});
+			});
 
 
-			// TODO: Discover via network scan
 		}
 	},
 
+	_bridgeDiscoveredViaSsdp: function() {
+		return new Promise(function(resolve, reject) {
+			if (!this._ssdp) {
+				this._ssdp = require("node-ssdp");
+			}
+
+			// TODO: Discover via SSDP
+			throw new Error("Scan via SSDP not yet implemented");
+		});
+	},
+
+	/**
+	 * Returns a promise that resolves when the official webservice returns an internal bridge IP for the current
+	 * network and rejects otherwise.
+	 *
+	 * @returns {Promise} The Promise that resolves when the bridge IP has been returned from the webservice
+	 * @private
+	 */
 	_bridgeDiscoveredViaWeb: function() {
 		return new Promise(function(resolve, reject) {
+			if (!this._https) {
+				this._https = require("https");
+			}
+
 			var options = {
 				host: 'www.meethue.com',
 				path: '/api/nupnp'
@@ -123,20 +146,20 @@ var BridgeTools = {
 				}
 			};
 
-			var req = this._https.request(options, function (res) {
-				var data = '';
-				res.on('data', function (chunk) {
-					data += chunk;
+			var request = this._https.request(options, function (response) {
+				var dataString = '';
+				response.oStringn('data', function (data) {
+					dataString += data;
 				});
-				res.on('end', function () {
-					onDataReceived(data);
+				response.on('end', function () {
+					onDataReceived(dataString);
 				});
 			});
-			req.on('error', function (e) {
-				reject(e);
+			request.on('error', function (ex) {
+				reject(ex);
 			});
-			req.end();
-		});
+			request.end();
+		}.bind(this));
 	},
 
 	/**
@@ -193,8 +216,12 @@ var BridgeTools = {
 	 * @private
 	 */
 	_programExists: function(execName) {
+		if (!this._fs) {
+			this._fs = require("fs");
+		}
+
 		// TODO: Are paths separated by ":" on every platform?
-		var paths = process.env.PATH.plit(":");
+		var paths = process.env.PATH.split(":");
 
 		for (var i = 0; i < paths.length; ++i) {
 			var execPath = paths[i] + "/" + execName;
@@ -226,6 +253,10 @@ var BridgeTools = {
 	_findNetworkAddresses4: function() {
 		var addresses = [];
 
+		if (!this._os) {
+			this._os = require("os");
+		}
+
 		var networkInterfaces = this._os.networkInterfaces();
 		for (var name in networkInterfaces) {
 			var interfaceInfos = networkInterfaces[name];
@@ -249,6 +280,11 @@ var BridgeTools = {
 	 */
 	_readConfig: function() {
 		var config = {};
+
+		if (!this._fs) {
+			this._fs = require("fs");
+		}
+
 		try {
 			var configData = this._fs.readFileSync(this._configPath, { encoding: "utf-8" });
 			// Remove comments which are invalid in real JSON
@@ -271,6 +307,10 @@ var BridgeTools = {
 	 * @public
 	 */
 	_writeConfig: function(config, doNotMerge) {
+		if (!this._fs) {
+			this._fs = require("fs");
+		}
+
 		if (!doNotMerge) {
 			var oldConfig = this._readConfig();
 			this._defaults(config, oldConfig);
@@ -318,14 +358,6 @@ var BridgeTools = {
 			user: this.config.bridgeUser,
 			port: this.config.bridgePort
 		};
-	},
-
-	createUser: function() {
-
-	},
-
-	findBridge: function() {
-
 	}
 
 };
@@ -336,10 +368,8 @@ BridgeTools.init();
 
 // Only exporting public interface
 module.exports = {
-	createUser:  BridgeTools.createUser.bind(BridgeTools),
-	findBridge:  BridgeTools.findBridge.bind(BridgeTools),
-	getBridgeConfig:  BridgeTools.getBridgeConfig.bind(BridgeTools),
-	ready:  BridgeTools.ready.bind(BridgeTools)
+	getBridgeConfig: BridgeTools.getBridgeConfig.bind(BridgeTools),
+	ready: BridgeTools.ready.bind(BridgeTools)
 };
 
 })(module, process);
