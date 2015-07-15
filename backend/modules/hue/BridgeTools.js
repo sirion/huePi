@@ -93,8 +93,14 @@ var BridgeTools = {
 					this.config.bridgeHost = bridgeData.bridgeHost;
 					return this.config;
 				}.bind(this), function() {
-					// TODO: Discover via network scan
-					throw new Error("Network scan discovery not implemented yet");
+					var BridgeScanner = require("./modules/hue/BridgeScanner.js");
+					var bridgeScanner = new BridgeScanner();
+					bridgeScanner.startIp("192.168.1.1");
+					bridgeScanner.numberOfHosts(254);
+					bridgeScanner.timeout(5000);
+					bridgeScanner.scan().then(function(hostInfo) {
+						this.config.bridgeHost = hostInfo.host;
+					});
 				});
 			});
 
@@ -103,6 +109,8 @@ var BridgeTools = {
 	},
 
 	_bridgeDiscoveredViaSsdp: function() {
+		return Promise.reject();
+
 		return new Promise(function(resolve, reject) {
 			if (!this._ssdp) {
 				this._ssdp = require("node-ssdp");

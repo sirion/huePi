@@ -8,7 +8,7 @@ var NetworkScanner = require("./NetworkScanner.js");
 function BridgeScanner() {
 	this._properties = {
 		ports: [ 80 ],
-		timeout: 1000
+		timeout: 10000
 	};
 
 	this._http = require('http');
@@ -36,7 +36,7 @@ BridgeScanner.prototype.scan = function() {
 			var onNoBridge = function(hostInfo) {
 				var doneIndex = done.indexOf(hostInfo.host + ":" + hostInfo.port);
 				if (doneIndex > -1) {
-					doneIndex.splice(doneIndex, 1);
+					done.splice(doneIndex, 1);
 				} else {
 					console.error("Scanned host/port not found in done-list: " + hostInfo.host + ":" + hostInfo.port);
 				}
@@ -56,7 +56,7 @@ BridgeScanner.prototype.scan = function() {
 			}
 
 		}.bind(this));
-	});
+	}.bind(this));
 };
 
 
@@ -93,7 +93,7 @@ BridgeScanner.prototype._verifyBridge = function(host, port) {
 					reject(hostInfo);
 				}
 			});
-		}).on("error", function() {
+		}).on("error", function(ex) {
 			reject(hostInfo);
 		}).setTimeout(this.timeout());
 	}.bind(this));

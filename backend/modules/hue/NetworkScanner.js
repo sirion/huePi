@@ -4,7 +4,9 @@
 "use strict";
 
 function NetworkScanner() {
-	this._properties = {};
+	this._properties = {
+		timeout: 30000
+	};
 
 	this._net = require('net');
 }
@@ -37,7 +39,7 @@ NetworkScanner.prototype.startIp = function(ip4) {
 	if (typeof ip4 === "string") {
 		ip4 = this._ip4ToInt(ip4);
 	}
-	return this.getSet("startIp", ip4);
+	return this._getSet("startIp", ip4);
 };
 
 /**
@@ -48,7 +50,10 @@ NetworkScanner.prototype.startIp = function(ip4) {
  * @public
  */
 NetworkScanner.prototype.numberOfHosts = function(number) {
-	return this.getSet("numberOfHosts", number);
+	if (number !== undefined) {
+		number = parseInt(number, 10);
+	}
+	return this._getSet("numberOfHosts", number);
 };
 
 /**
@@ -59,10 +64,10 @@ NetworkScanner.prototype.numberOfHosts = function(number) {
  * @public
  */
 NetworkScanner.prototype.ports = function(ports) {
-	if (!Array.isArray(ports)) {
+	if (ports !== undefined && !Array.isArray(ports)) {
 		ports = [ ports ];
 	}
-	return this.getSet("ports", ports);
+	return this._getSet("ports", ports);
 };
 
 /**
@@ -73,7 +78,7 @@ NetworkScanner.prototype.ports = function(ports) {
  * @public
  */
 NetworkScanner.prototype.timeout = function(ms) {
-	return this.getSet("timeout", ms);
+	return this._getSet("timeout", ms);
 };
 
 /**
@@ -156,7 +161,7 @@ NetworkScanner.prototype.scanned = function(host, port) {
 		client.on("error", onError);
 		client.setTimeout(this.timeout());
 		client.connect(port, host);
-	});
+	}.bind(this));
 };
 
 NetworkScanner.prototype._ip4ToInt = function(ipString) {
