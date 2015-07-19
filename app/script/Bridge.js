@@ -1,4 +1,6 @@
-(function(window, undefined) {
+/* global module */
+
+(function() {
 "use strict";
 
 function Bridge() {
@@ -27,18 +29,30 @@ Bridge.getInstance = function() {
 
 ////////////////////////////////////////// Public Methods /////////////////////////////////////////
 
+Bridge.prototype.bridgeUrl = function(url) {
+	if (url === undefined) {
+		return this._sBridgeUrl;
+	} else {
+		this._sBridgeUrl = url;
+		return this;
+	}
+};
+
 Bridge.prototype.initialized = function() {
 	return this._pInitialized;
 };
 
 Bridge.prototype.update = function() {
 	if (!this._pUpdate) {
+		console.log("Creating new update request...");
 		this._pUpdate = this._bridgeRequest({ url: "lights" }).then(function(oData) {
+			console.log("Update successfull");
 			this._pUpdate = null;
 			this._oLightState = oData.data;
 			this._fire("update", [ this._oLightState ]);
 			return this._oLightState;
-		}.bind(this)).catch(function() {
+		}.bind(this), function() {
+			console.log("Update failed");
 			this._pUpdate = null;
 			throw new Error("Cannot receive bridge status data");
 		}.bind(this));
@@ -161,9 +175,9 @@ Bridge.prototype._request = function(mOptions) {
 		throw new Error("url-property is needed in argument for request function");
 	}
 
+
 	return new Promise(function(fnResolve, fnReject) {
 		var request = new XMLHttpRequest();
-
 		request.addEventListener("readystatechange", function() {
 			if (request.readyState === XMLHttpRequest.DONE) {
 
@@ -182,7 +196,21 @@ Bridge.prototype._request = function(mOptions) {
 			}
 		});
 
+		request.addEventListener("error", function(error) {
+			fnReject(error);
+		});
+
+		request.addEventListener("timeout", function(error) {
+			fnReject(error);
+		});
+
+		if (mRequestOptions.headers) {
+			Object.keys(mRequestOptions.headers).forEach(function(header) {
+				request.setRequestHeader(header, mRequestOptions.headers[header]);
+			});
+		}
 		request.open(mRequestOptions.method, mRequestOptions.url, mRequestOptions.async);
+		console.log("sent: " + JSON.stringify(mRequestOptions));
 		request.send(mRequestOptions.data);
 	});
 };
@@ -195,23 +223,15 @@ Bridge.prototype._bridgeRequest = function(mOptions) {
 
 
 
-
-
-
-
-
-
-
-
-
-
 ////////////////////////////////////////// Helper Functions /////////////////////////////////////////
 
 
+if (typeof module !== "undefined") {
+	var XMLHttpRequest = require("./XMLHttpRequest.js");
+	module.exports = Bridge;
+} else if (typeof window !== "undefined"){
+	// Export to global namespace
+	window.Bridge = Bridge;
+}
 
-
-
-// Export to global namespace
-window.Bridge = Bridge;
-
-})(window);
+})();
