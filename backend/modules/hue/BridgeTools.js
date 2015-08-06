@@ -3,6 +3,8 @@
 (function(module, process) {
 "use strict";
 
+var SystemTools = require("./SystemTools.js");
+
 var BridgeTools = {
 
 	_defaultConfig: {
@@ -30,11 +32,6 @@ var BridgeTools = {
 	}.bind(this)),
 
 	init: function() {
-		if (!this._checkRequiredPrograms()) {
-			console.error("Please install required programs in the system");
-			throw new Error("Not all required programs are available on the system");
-		}
-
 		this._isWindows = process.platform.indexOf("win") === 0;
 		this._userDir = process.env[this._isWindows ? 'USERPROFILE' : 'HOME'];
 		this._appDir = this._userDir + "/.huePi";
@@ -43,6 +40,12 @@ var BridgeTools = {
 		this.config = this._readConfig();
 		this._defaults(this.config, this._defaultConfig);
 		// console.log("read config: " + JSON.stringify(this.config, null, 4));
+
+		
+		if ((!this.config.bridgeUser || !this.config.bridgeHost) && !SystemTools.checkRequiredPrograms(this._requiredPrograms, this._requiredModules)) {
+			console.error("Please install required programs in the system");
+			throw new Error("Not all required programs are available on the system");
+		}
 
 		return this._whenBridgeDiscovered().then(function() {
 			return this._whenUserCreated();
@@ -186,73 +189,6 @@ var BridgeTools = {
 	},
 
 	/**
-	 * Checks if all programs needed to run the methods of this class are available on the system
-	 *
-	 * @returns {void}
-	 * @private
-	 */
-	_checkRequiredPrograms: function() {
-		var hasRequiredPrograms = this._requiredPrograms.reduce(function(previousValue, currentValue) {
-			var programExists = this._programExists(currentValue);
-			if (!programExists) {
-				console.error("Required program " + currentValue + " not found in path.");
-			}
-			return previousValue && programExists;
-		}.bind(this));
-
-		var hasrequiredModules = this._requiredModules.reduce(function(previousValue, currentValue) {
-			var programExists = false;
-			try {
-				require.resolve(currentValue);
-				programExists = true;
-			} catch (ex) {
-				console.error("Required module " + currentValue + " not found in path.");
-			}
-
-			return previousValue && programExists;
-		});
-
-		return hasRequiredPrograms && hasrequiredModules;
-	},
-
-	/**
-	 * Checks for the existence of the given file in all paths. On windows also checks for the given
-	 * name + ".exe", ".com", ".bat", ".cmd
-	 *
-	 * @param {string} execName - The name of the executable to search for
-	 * @returns {boolean} Whether the executable exists in the path
-	 * @private
-	 */
-	_programExists: function(execName) {
-		if (!this._fs) {
-			this._fs = require("fs");
-		}
-
-		// TODO: Are paths separated by ":" on every platform?
-		var paths = process.env.PATH.split(":");
-
-		for (var i = 0; i < paths.length; ++i) {
-			var execPath = paths[i] + "/" + execName;
-			if (this._fs.existsSync(execPath)) {
-				return true;
-			}
-
-			if (this._isWindows) {
-				if (
-					this._fs.existsSync(execPath + ".exe") ||
-					this._fs.existsSync(execPath + ".com") ||
-					this._fs.existsSync(execPath + ".bat") ||
-					this._fs.existsSync(execPath + ".cmd")
-				) {
-					return true;
-				}
-			}
-		}
-
-		return false;
-	},
-
-	/**
 	 * Returns a list of all IPv4 addresses bound to the network interfaces on this machine, exluding 127.0.0.1
 	 *
 	 * @returns {string[]} A list of IPv4 addresses
@@ -293,16 +229,21 @@ var BridgeTools = {
 			this._fs = require("fs");
 		}
 
-		try {
-			var configData = this._fs.readFileSync(this._configPath, { encoding: "utf-8" });
-			// Remove comments which are invalid in real JSON
-			configData = configData
-				.replace(/\/\/.*/g, "")
-				.replace(/\/\*.*\*\//gm, "");
-			config = JSON.parse(configData);
-		} catch (ex) {
-			console.error("Config file could not be parsed: " + this._configPath);
+		if (!this._fs.existsSync(this._configPath)) {
+			console.log("Config file does not exist, will be created: " + this._configPath);
+		} else {
+			try {
+				var configData = this._fs.readFileSync(this._configPath, { encoding: "utf-8" });
+				// Remove comments which are invalid in real JSON
+				configData = configData
+					.replace(/\/\/.*/g, "")
+					.replace(/\/\*.*\*\//gm, "");
+				config = JSON.parse(configData);
+			} catch (ex) {
+				console.error("Config file could not be parsed: " + this._configPath);
+			}
 		}
+
 		return config;
 	},
 

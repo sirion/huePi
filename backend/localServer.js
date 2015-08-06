@@ -91,6 +91,9 @@ function onRequest(request, response) {
 				response.end();
 			});
 		});
+		proxy.on("error", function(error) {
+			console.error("Could not proxy request to " + options.hostname + options.path + ": " + error.message);
+		});
 
 		// Client to bridge
 		request.on("data", function(data) {
@@ -99,6 +102,7 @@ function onRequest(request, response) {
 		request.on("end", function() {
 			proxy.end();
 		});
+		
 
 	} else {
 		fileServer.serve(request, response);

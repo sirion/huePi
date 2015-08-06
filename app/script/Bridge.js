@@ -1,7 +1,21 @@
-/* global module */
+/* global module, require */
 
 (function() {
 "use strict";
+
+// The Bridge can be used in client side scenarios as well as server side.
+// TODO: This is a bad architecture - find a better way to reuse the code.
+var XMLHttpRequest;
+if (typeof module !== "undefined") {
+	XMLHttpRequest = require("./XMLHttpRequest.js");
+	module.exports = Bridge;
+} else if (typeof window !== "undefined"){
+	XMLHttpRequest = window.XMLHttpRequest;
+	// Export to global namespace
+	window.Bridge = Bridge;
+}
+
+
 
 function Bridge() {
 	if (Bridge._oInstance) {
@@ -180,27 +194,38 @@ Bridge.prototype._request = function(mOptions) {
 		var request = new XMLHttpRequest();
 		request.addEventListener("readystatechange", function() {
 			if (request.readyState === XMLHttpRequest.DONE) {
+				
+				if (request.status >= 200 && request.status < 300) {
+					// Ok
+					var data;
+					if (request.getResponseHeader("content-type") == "application/json") {
+						data = JSON.parse(request.responseText);
+					} else {
+						data = request.responseText;
+					}
 
-				var data;
-				if (request.getResponseHeader("content-type") == "application/json") {
-					data = JSON.parse(request.responseText);
+
+					fnResolve({
+						data: data,
+						request: request
+					});
 				} else {
-					data = request.responseText;
+					fnReject({
+						data: data,
+						request: request
+					});
 				}
 
-
-				fnResolve({
-					data: data,
-					request: request
-				});
 			}
 		});
 
-		request.addEventListener("error", function(error) {
+		request.addEventListener("error", function(event) {
+			debugger;
 			fnReject(error);
 		});
 
-		request.addEventListener("timeout", function(error) {
+		request.addEventListener("timeout", function(event) {
+			debugger;
 			fnReject(error);
 		});
 
@@ -225,13 +250,5 @@ Bridge.prototype._bridgeRequest = function(mOptions) {
 
 ////////////////////////////////////////// Helper Functions /////////////////////////////////////////
 
-
-if (typeof module !== "undefined") {
-	var XMLHttpRequest = require("./XMLHttpRequest.js");
-	module.exports = Bridge;
-} else if (typeof window !== "undefined"){
-	// Export to global namespace
-	window.Bridge = Bridge;
-}
 
 })();
