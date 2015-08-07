@@ -1,0 +1,8 @@
+<mvc:View xmlns="sap.m" xmlns:huePi="sap.ui.iot.huePi.views" xmlns:l="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" controllerName="sap.ui.iot.huePi.views.Scenes">
+	<Text text="Scenes" />
+	<List items="scenes>/">
+		<CustomListItem>
+			<Text text="{name}" />
+		</CustomListItem>
+	</List>
+</mvc:View>

@@ -60,18 +60,36 @@ Bridge.prototype.update = function() {
 	if (!this._pUpdate) {
 		console.log("Creating new update request...");
 		this._pUpdate = this._bridgeRequest({ url: "lights" }).then(function(oData) {
-			console.log("Update successfull");
+			console.log("Lights Update successfull");
 			this._pUpdate = null;
 			this._oLightState = oData.data;
 			this._fire("update", [ this._oLightState ]);
 			return this._oLightState;
 		}.bind(this), function() {
-			console.log("Update failed");
+			console.log("Lights Update failed");
 			this._pUpdate = null;
 			throw new Error("Cannot receive bridge status data");
 		}.bind(this));
 	}
 	return this._pUpdate;
+};
+
+Bridge.prototype.updateScenes = function() {
+	if (!this._pSceneUpdate) {
+		console.log("Creating new update request...");
+		this._pUpdate = this._bridgeRequest({ url: "scenes" }).then(function(oData) {
+			console.log("Scene Update successfull");
+			this._pSceneUpdate = null;
+			this._oScenes = oData.data;
+			this._fire("updateScenes", [ this._oScenes ]);
+			return this._oScenes;
+		}.bind(this), function() {
+			console.log("Scene Update failed");
+			this._pSceneUpdate = null;
+			throw new Error("Cannot receive bridge scene data");
+		}.bind(this));
+	}
+	return this._pSceneUpdate;
 };
 
 Bridge.prototype.toggleLight = function(sLightId, bState) {
