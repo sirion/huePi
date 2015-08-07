@@ -15,7 +15,7 @@ var BridgeTools = {
 
 	_requiredPrograms: [
 		// removed: ip grep awk tail sed
-		"nmap", "awk", "sed", "curl", "grep", "wc", "sort", "uniq", "cat", "ip", "tail"
+		// "nmap", "awk", "sed", "curl", "grep", "wc", "sort", "uniq", "cat", "ip", "tail" // Not needed any more, since we do not call bash scripts
 	],
 
 	_requiredModules: [
@@ -88,12 +88,14 @@ var BridgeTools = {
 			return this._bridgeDiscoveredViaSsdp().then(function(bridgeData) {
 				// SSDP Scan successful
 				this.config.bridgeHost = bridgeData.bridgeHost;
+				this._writeConfig();
 				return this.config;
 			}.bind(this), function() {
 				// SSDP Scan not successful
 				// Discover via web service
 				return this._bridgeDiscoveredViaWeb().then(function(bridgeData) {
 					this.config.bridgeHost = bridgeData.bridgeHost;
+					this._writeConfig();
 					return this.config;
 				}.bind(this), function() {
 					var BridgeScanner = require("./modules/hue/BridgeScanner.js");
@@ -101,9 +103,11 @@ var BridgeTools = {
 					bridgeScanner.startIp("192.168.1.1");
 					bridgeScanner.numberOfHosts(254);
 					bridgeScanner.timeout(5000);
-					bridgeScanner.scan().then(function(hostInfo) {
+					return bridgeScanner.scan().then(function(hostInfo) {
 						this.config.bridgeHost = hostInfo.host;
-					});
+						this._writeConfig();
+						return this.config;
+					}.bind(this));
 				});
 			});
 
@@ -185,6 +189,8 @@ var BridgeTools = {
 			return Promise.resolve();
 		} else {
 			throw "BridgeTools._whenUserCreated: Not yet implemented";
+			// TODO: IMplement user creation. Afterwards: this._writeConfig();
+
 		}
 	},
 
@@ -256,6 +262,9 @@ var BridgeTools = {
 	 * @public
 	 */
 	_writeConfig: function(config, doNotMerge) {
+		if (config === undefined) {
+			config = {};
+		}
 		if (!this._fs) {
 			this._fs = require("fs");
 		}
